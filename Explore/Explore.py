@@ -26,25 +26,52 @@ def trans_freq_1way_view(trp):
 # Requires nx3 ndarray from a triplets file
 # Returns a mX2 ndarray:
 # column 1 contains the count of how many address pairs had exactly the number in column 0 one-way transactions
-    trp = trp[:,2]
-    x = np.linspace(trp.min(),trp.max(),trp.max())
-    y = [len(trp[np.where(trp == i)]) for i in x]
+    trans = trp[:,2]
+    x = np.linspace(trans.min(),trans.max(),trans.max())
+    y = [len(trans[np.where(trans == i)]) for i in x]
     view = np.empty((len(x),2))
     view[:,0] = x
     view[:,1] = y
     view = view[view[:,1].nonzero()]
     return view
 
-#def trans_freq_2way_view(trp):
+# def trans_freq_2way_view(trp):
 # Requires nx3 ndarray from a triplets file
 # Returns a mX2 ndarray:
 # column 1 contains the count of how many address pairs had exactly the number in column 0 transactions
 # This combines transactions in both directions
-
+#     sends = trp.copy()
+#     recs = trp
+#     recs[:,0] = 
+#     for i in range(len(trp)):
+#          
+#     trans = trp[:,2]
+#     x = np.linspace(trans.min(),trans.max(),trans.max())
+    
+def sender_rank_view(trp, receivers=False ):
+# Requires nx3 ndarray from a triplets file -- MAY BE MODIFIED
+# Optional receivers bool to return receivers rank view
+# Returns a mX2 ndarray: Address and (sorted by) number of sends(receives) 
+    if receivers:
+        trp = trp.sort(axis=1)
+        addrs = trp[:,1]
+    else:
+        # Assumes sorted by senders already 
+        addrs = trp[:,0]
+    senders = np.unique(addrs)
+#    sends = [trp[:,2][np.where(addrs == x)].sum() for x in senders]
+    sends = [trp[:,2][np.searchsorted(trp[:,0], x, 'left'): \
+                      np.searchsorted(trp[:,0], x, 'right')].sum() for x in senders]
+    print "Senders: %s, sends: %s" % (len(senders), len(sends))
+    ret = np.empty((len(senders),2))
+    ret[:,0] = senders
+    ret[:,1] = sends
+#    return ret.sort(kind='mergesort')
+    return ret
 
 def collect_alt_views(array, name, comments = ""):
 # Requires an ndarray and a filename (with path) and optional comments for the file
-    np.savetxt(name, array, header = comments)
+    np.savetxt(name, array,fmt='%d', header = comments)
 
 def main(argv):
     parser = OptionParser()
@@ -58,9 +85,12 @@ def main(argv):
     train = Utils.read_train_trps_txt(path)
     #print "Transaction stats"
     #stats_explore(train[:,2])
-    collect_alt_views(trans_freq_1way_view(train), path + 'transFreqView.txt', \
-                       'Number of transactions; Count of one way address pairs')
-    
+#     collect_alt_views(trans_freq_1way_view(train.copy()), path + 'trans1WayFreqView.txt', \
+#                        'Number of transactions; Count of one way address pairs')
+    collect_alt_views(sender_rank_view(train.copy()), path + "SendersRanked.txt", \
+                      comments="Sender Address; Count of Sends")
+#     collect_alt_views(sender_rank_view(train.copy(), receivers=True), path + "ReceiversRanked.txt", \
+#                       comments="Receiver Address; Count of Receipts")
 
     print time.time() - start_time
 
