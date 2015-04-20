@@ -10,14 +10,15 @@ import numpy as np
 TRAIN_FNAME = "txTripletsCounts.txt"
 TEST_FNAME = "testTriplets.txt"
 
-def read_train_trps_txt(path):
+def read_train_trps_txt(path, skip = 0):
 # Accepts path to TRAIN_FNAME, returns float ndarry
-    return np.loadtxt(path + TRAIN_FNAME)
+# Can be given a number of rows to skip to allow a faster abbreviated import
+    return np.loadtxt(path + TRAIN_FNAME, skiprows = skip)
 
-def read_test_trps_txt(path):
+def read_test_trps_txt(path, skip = 0):
 # Accepts path to TEST_FNAME, returns float ndarry
-    return np.loadtxt(path + TEST_FNAME)
-
+# Can be given a number of rows to skip to allow a faster abbreviated import
+    return np.loadtxt(path + TEST_FNAME, skiprows = skip)
 
 def main(argv):
     parser = OptionParser()
