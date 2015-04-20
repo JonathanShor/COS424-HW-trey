@@ -48,26 +48,33 @@ def trans_freq_1way_view(trp):
 #     trans = trp[:,2]
 #     x = np.linspace(trans.min(),trans.max(),trans.max())
     
-def sender_rank_view(trp, receivers=False ):
+def sender_rank_view(trips, receivers=False ):
 # Requires nx3 ndarray from a triplets file -- MAY BE MODIFIED
-# Optional receivers bool to return receivers rank view
-# Returns a mX2 ndarray: Address and (sorted by) number of sends(receives) 
+# Optional receivers bool to return receivers rank view instead of default senders
+# Returns a mX2 ndarray: Address and (rev sorted by) number of sends(receives)
+# m = # unique senders (receivers)
     if receivers:
-        trp = trp.sort(axis=1)
-        addrs = trp[:,1]
+        # Sort by senders, and swap senders into column 0, rec into col 1
+        temp = trips[np.argsort(trips[:,1])]
+        trp = temp.copy()
+        trp[:,0] = temp[:,1]
+        trp[:,1] = temp[:,0]
+#        addrs = trp[:,1]
     else:
-        # Assumes sorted by senders already 
-        addrs = trp[:,0]
+        # Assumes sorted by senders already
+        trp = trips 
+    addrs = trp[:,0]
     senders = np.unique(addrs)
 #    sends = [trp[:,2][np.where(addrs == x)].sum() for x in senders]
     sends = [trp[:,2][np.searchsorted(trp[:,0], x, 'left'): \
                       np.searchsorted(trp[:,0], x, 'right')].sum() for x in senders]
-    print "Senders: %s, sends: %s" % (len(senders), len(sends))
+#    print "Senders: %s, sends: %s" % (len(senders), len(sends))
+#    print "Sum matching, orig -- new: %s -- %s" % (trips[:,2].sum(), np.array(sends).sum())
     ret = np.empty((len(senders),2))
     ret[:,0] = senders
     ret[:,1] = sends
-#    return ret.sort(kind='mergesort')
-    return ret
+    return ret[np.argsort(ret[:,1])][::-1]
+
 
 def collect_alt_views(array, name, comments = ""):
 # Requires an ndarray and a filename (with path) and optional comments for the file
@@ -87,10 +94,12 @@ def main(argv):
     #stats_explore(train[:,2])
 #     collect_alt_views(trans_freq_1way_view(train.copy()), path + 'trans1WayFreqView.txt', \
 #                        'Number of transactions; Count of one way address pairs')
-    collect_alt_views(sender_rank_view(train.copy()), path + "SendersRanked.txt", \
+    print "Collecting SendersRankedView.txt"
+    collect_alt_views(sender_rank_view(train.copy()), path + "SendersRankedView.txt", \
                       comments="Sender Address; Count of Sends")
-#     collect_alt_views(sender_rank_view(train.copy(), receivers=True), path + "ReceiversRanked.txt", \
-#                       comments="Receiver Address; Count of Receipts")
+    print "Collecting ReceiversRankedView.txt"
+    collect_alt_views(sender_rank_view(train.copy(), receivers=True), path + "ReceiversRankedView.txt", \
+                       comments="Receiver Address; Count of Receipts")
 
     print time.time() - start_time
 
