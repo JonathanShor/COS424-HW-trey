@@ -35,6 +35,15 @@ def trans_freq_1way_view(trp):
     view = view[view[:,1].nonzero()]
     return view
 
+def SCCs_freq_view(SCCs):
+# Given SCCs labels array of len N, return Nx2 ndarray with counts of each SCC label
+# Sorted
+    num_SCC = len(np.unique(SCCs))
+    view = np.empty((num_SCC,2))
+    view[:,0] = np.arange(num_SCC)
+    view[:,1] = [len(SCCs[np.where(SCCs == i)]) for i in view[:,0]]
+    return view[np.argsort(view[:,1])][::-1]
+
 # def trans_freq_2way_view(trp):
 # Requires nx3 ndarray from a triplets file
 # Returns a mX2 ndarray:
