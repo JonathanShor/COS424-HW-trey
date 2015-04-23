@@ -84,6 +84,14 @@ def sender_rank_view(trips, receivers=False ):
     ret[:,1] = sends
     return ret[np.argsort(ret[:,1])][::-1]
 
+def CCgen_view(ccgen):
+# Given networkx CC generator, return # of CCsX2 ndarray
+# Col 0: one vertex in CC; Col 1 (sorted): # of vertex in CC
+    first = ccgen.next()
+    cc_cnts = np.array([[first[0],len(first)]])
+    for cc in ccgen:
+        cc_cnts = np.vstack((cc_cnts, [[cc[0], len(cc)]]))
+    return cc_cnts[np.argsort(cc_cnts[:,1])][::-1]
 
 def collect_alt_views(array, name, comments = ""):
 # Requires an ndarray and a filename (with path) and optional comments for the file

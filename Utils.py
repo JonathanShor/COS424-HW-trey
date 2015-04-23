@@ -6,18 +6,25 @@ Created on Apr 13, 2015
 from optparse import OptionParser
 import time,sys
 import numpy as np
+import networkx as nx
 
 TRAIN_FNAME = "txTripletsCounts.txt"
 TEST_FNAME = "testTriplets.txt"
 
-def read_train_trps_txt(path, skip = 0):
-# Accepts path to TRAIN_FNAME, returns float ndarry
-# Can be given a number of rows to skip to allow a faster abbreviated import
+def read_train_trps_txt(path, toNX=False, skip = 0):
+# Accepts path to TRAIN_FNAME
+# If toNX, returns a nx.DiGraph, otherwise returns a ndarray
+# Can be given a number of rows to skip, ndarray case only
+    if toNX:
+        return nx.read_weighted_edgelist(path + TRAIN_FNAME, create_using=nx.DiGraph(), nodetype=float)
     return np.loadtxt(path + TRAIN_FNAME, skiprows = skip)
 
-def read_test_trps_txt(path, skip = 0):
-# Accepts path to TEST_FNAME, returns float ndarry
-# Can be given a number of rows to skip to allow a faster abbreviated import
+def read_test_trps_txt(path, toNX=False, skip = 0):
+# Accepts path to TEST_FNAME
+# If toNX, returns a nx.DiGraph, otherwise returns a ndarray
+# Can be given a number of rows to skip, ndarray case only
+    if toNX:
+        return nx.read_weighted_edgelist(path + TRAIN_FNAME, create_using=nx.DiGraph(), nodetype=float)
     return np.loadtxt(path + TEST_FNAME, skiprows = skip)
 
 def main(argv):
