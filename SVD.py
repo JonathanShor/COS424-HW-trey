@@ -57,7 +57,8 @@ def svdAnalysis(Xsparse, Test):
     # ratios, the singular values themselves, and a 2D projection for plotting.
     (singular_vals, variance_ratios, X2d) = svdData(Xsparse)
     plt.figure()
-    plt.plot(np.toarray(singular_vals).reverse(), 'bo-')
+    print singular_vals.shape
+    plt.plot(np.fliplr([singular_vals])[0], 'bo-')
     plt.title('Singular Values: Decreasing Magnitude')
     plt.figure()
     plt.plot(variance_ratios, 'bo-')
