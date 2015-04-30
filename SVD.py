@@ -91,6 +91,7 @@ def main(argv):
     Xtrain_sparse = GraphView.get_coo(Xtrain)
 
     svdAnalysis(Xtrain_sparse, None)
+    print time.time() - start_time
     plt.show()
 
 

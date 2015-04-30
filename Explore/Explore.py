@@ -44,19 +44,6 @@ def SCCs_freq_view(SCCs):
     view[:,1] = [len(SCCs[np.where(SCCs == i)]) for i in view[:,0]]
     return view[np.argsort(view[:,1])][::-1]
 
-# def trans_freq_2way_view(trp):
-# Requires nx3 ndarray from a triplets file
-# Returns a mX2 ndarray:
-# column 1 contains the count of how many address pairs had exactly the number in column 0 transactions
-# This combines transactions in both directions
-#     sends = trp.copy()
-#     recs = trp
-#     recs[:,0] = 
-#     for i in range(len(trp)):
-#          
-#     trans = trp[:,2]
-#     x = np.linspace(trans.min(),trans.max(),trans.max())
-    
 def sender_rank_view(trips, receivers=False ):
 # Requires nx3 ndarray from a triplets file -- MAY BE MODIFIED
 # Optional receivers bool to return receivers rank view instead of default senders
@@ -84,18 +71,29 @@ def sender_rank_view(trips, receivers=False ):
     ret[:,1] = sends
     return ret[np.argsort(ret[:,1])][::-1]
 
-def CCgen_view(ccgen):
+def gen_view(ccgen, gentype = 'cc'):
 # Given networkx CC generator, return # of CCsX2 ndarray
-# Col 0: one vertex in CC; Col 1 (sorted): # of vertex in CC
+# Col 0: arb representative vertex in CC; Col 1 (sorted): # of vertex in CC
+    if gentype == 'cc':
+        putSec = len    #Grab the CC size
+    elif gentype == 'deg':
+        def putSec(x):  #Grab the degree val from the 2-tuple
+            return x[1]
     first = ccgen.next()
-    cc_cnts = np.array([[first[0],len(first)]])
+    cc_cnts = np.array([[first[0],putSec(first)]])
     for cc in ccgen:
-        cc_cnts = np.vstack((cc_cnts, [[cc[0], len(cc)]]))
+        cc_cnts = np.vstack((cc_cnts, [[cc[0], putSec(cc)]]))
     return cc_cnts[np.argsort(cc_cnts[:,1])][::-1]
 
 def collect_alt_views(array, name, comments = ""):
 # Requires an ndarray and a filename (with path) and optional comments for the file
+    print "Writing %s" % name
     np.savetxt(name, array,fmt='%d', header = comments)
+    return None
+
+def get_alt_view(fn):
+# Requrie fully pathed filename to a txt file created with collect_alt_views
+    return np.loadtxt(fn, dtype='int')
 
 def main(argv):
     parser = OptionParser()
@@ -113,10 +111,19 @@ def main(argv):
 #                        'Number of transactions; Count of one way address pairs')
     print "Collecting SendersRankedView.txt"
     collect_alt_views(sender_rank_view(train.copy()), path + "SendersRankedView.txt", \
-                      comments="Sender Address; Count of Sends")
+                      comments="Sender Address; Count of trans sent")
     print "Collecting ReceiversRankedView.txt"
     collect_alt_views(sender_rank_view(train.copy(), receivers=True), path + "ReceiversRankedView.txt", \
-                       comments="Receiver Address; Count of Receipts")
+                       comments="Receiver Address; Count of trans received")
+    
+    A1 = get_alt_view(path + 'A1View.txt')
+    print "Collecting SendeesRankedView.txt"
+    collect_alt_views(sender_rank_view(A1.copy()), path + "SendeesRankedView.txt", \
+                      comments="Sender Address; Count of addresses sent to")
+    print "Collecting ReceiveesRankedView.txt"
+    collect_alt_views(sender_rank_view(A1.copy(), receivers=True), path + "ReceiveesRankedView.txt", \
+                       comments="Receiver Address; Count of addresses received from")
+
 
     print time.time() - start_time
 
