@@ -8,6 +8,7 @@
 from sklearn.metrics import *
 import scipy.sparse as sp
 import numpy as np
+import matplotlib.pyplot as plt
 
 ###############################################################################
 # Calculate performance metrics.
@@ -19,13 +20,13 @@ import numpy as np
 ###############################################################################
 def performance_metrics(test_entries, matrix):
     # Gather and process data
-    matrix_prediction = makeProbabilites(matrix)
+    matrix_prediction = constrain(matrix)
     test_labels = test_entries[:,2]
     predictions = []
     for i in range(test_labels.shape[0]):
         sender = test_entries[i,0]
         receiver = test_entries[i,1]
-        predictions[i] = matrix_prediction([sender, receiver])
+        predictions[i] = matrix_prediction[sender, receiver]
     predictions = np.array(predictions)
 
     # roc_curve returns false-positive and true-positive rates
@@ -50,12 +51,12 @@ def makeWeightedProbabilities(matrix):
     rows = matrix.shape[0]
     cols = matrix.shape[1]
     col_sums = matrix.sum(1)
-    for i in range(rows)
+    for i in range(rows):
         sum = col[i,0]
-        if (sum = 0):
+        if (sum == 0):
             continue
-        for j in range(cols)
-            matrix[i, j] = matrix[i, j]/sum;
+        for j in range(cols):
+            matrix[i, j] = matrix[i, j]/sum
 
     return (matrix)
 
@@ -64,14 +65,14 @@ def makeWeightedProbabilities(matrix):
 # prediction above 1 is taken as truth. Any negative values are treated as
 # absolute no (0). And in between (0,1) are probabilities.
 ###############################################################################
-def constrain(matrix)
+def constrain(matrix):
     rows = matrix.shape[0]
     cols = matrix.shape[1]
-    for i in range(rows)
-        for j in range(cols)
+    for i in range(rows):
+        for j in range(cols):
             if (matrix[i, j] > 1):
                 matrix[i, j] = 1
-            elif (matrix[i, j] < 0)
+            elif (matrix[i, j] < 0):
                 matrix[i, j] = 0
 
     return (matrix)
@@ -79,9 +80,8 @@ def constrain(matrix)
 ###############################################################################
 # Helper method to plot the results of the ROC curve.
 ###############################################################################
-def plotROC(fpr, tpr)
+def plotROC(fpr, tpr):
     ax = plt.figure()
-    print len(fpr)
     colors = ['b','g','r','c','m','y','k']
     for c in range(len(fpr)):
         (this_fpr, this_tpr) = (fpr[c], tpr[c])
@@ -93,7 +93,8 @@ def plotROC(fpr, tpr)
     plt.ylabel('True Positive Rate')
     plt.title('Reciever Operating Characteristic')
     plt.legend(loc = 'best', prop={'size':10})
-    plt.show()
+
+    return
 
 
 

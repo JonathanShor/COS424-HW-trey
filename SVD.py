@@ -10,7 +10,8 @@ from optparse import OptionParser
 from GraphView import GraphView
 import numpy as np
 import Utils
-import time, sys
+import PerfMetrics
+import time, sys, math
 import scipy.sparse as sp
 from sklearn.decomposition import TruncatedSVD
 import matplotlib.pyplot as plt
@@ -23,14 +24,15 @@ from scipy.sparse.linalg import svds
 # (for easy investigative plotting).
 ###############################################################################
 def svdData(Xtrain):
-    (u, s, vt) = svd_svals = svds(Xtrain, k = 30)
+    # commenting this out since it doesn't take a numpy data type
+    #(u, s, vt) = svd_svals = svds(Xtrain, k = 30)
     svd_variance = TruncatedSVD(n_components = 30)
     svd_variance.fit(Xtrain)
     variance_ratios = svd_variance.explained_variance_ratio_
     svd = TruncatedSVD(n_components = 2)
     svd.fit(Xtrain)
     X2D = svd.fit_transform(Xtrain)
-    return (s, variance_ratios, X2D)
+    return (variance_ratios, X2D)
 
 ###############################################################################
 # Helper method to run a single SVD decomposition, selecting only n
@@ -40,6 +42,7 @@ def doSVD(Xtrain, n):
     svd = TruncatedSVD(n_components = n)
     svd.fit(Xtrain)
     Xpredict = svd.fit_transform(Xtrain)
+    Xpredict = svd.inverse_transform(Xpredict)
     return (Xpredict)
 
 ###############################################################################
@@ -55,11 +58,11 @@ def svdAnalysis(Xsparse, Test):
 
     # Compute the details on a SVD decomposition - the explained variance
     # ratios, the singular values themselves, and a 2D projection for plotting.
-    (singular_vals, variance_ratios, X2d) = svdData(Xsparse)
-    plt.figure()
-    print singular_vals.shape
-    plt.plot(np.fliplr([singular_vals])[0], 'bo-')
-    plt.title('Singular Values: Decreasing Magnitude')
+    (variance_ratios, X2d) = svdData(Xsparse)
+    #plt.figure()
+    #print singular_vals.shape
+    #plt.plot(np.fliplr([singular_vals])[0], 'bo-')
+    #plt.title('Singular Values: Decreasing Magnitude')
     plt.figure()
     plt.plot(variance_ratios, 'bo-')
     plt.title('Singular Values: Decreasing Explained Variance')
@@ -72,9 +75,34 @@ def svdAnalysis(Xsparse, Test):
     Xpredict = doSVD(Xsparse, 12)
 
     # Compute errors
-    # TODO: Threshold for a valid transaction?
-    errors = None
-    return errors
+    (fpr, tpr, auc, f1, precision, recall) = \
+        PerfMetrics.performance_metrics(Test, Xpredict)
+
+    PerfMetrics.plotROC(fpr, tpr)
+    return
+
+###############################################################################
+# Count transactions as either true or false.
+###############################################################################
+def binarize(Xsparse):
+    X_binary = Xsparse
+    X_binary.data[:] = 1
+    return (X_binary)
+
+###############################################################################
+# Bin transactions counts. Put it in a bin according to what power of e it is.
+# This should make it a bit denser near the bottom. Add 1, so that you start
+# bin counts at 1. 0 is the auto bin for the sparse entries.
+###############################################################################
+def bin_a_rize(Xsparse, n):
+    X_bins = Xsparse
+    values = X_bins.data
+    for i in range(values.shape[0]):
+        bin = math.ceil(math.log(values[i])) + 1
+        if (bin > n):
+            bin = n
+        values[i] = bin
+    return (X_bins)
 
 ###############################################################################
 # Main. Read in data and run analysis.
@@ -87,14 +115,13 @@ def main(argv):
     print "PATH = " + path
     start_time = time.time()
 
+    Test = Utils.read_test_trps_txt(path)
     Xtrain = Utils.read_train_trps_txt(path)
     Xtrain_sparse = GraphView.get_coo(Xtrain)
-
-    svdAnalysis(Xtrain_sparse, None)
+    print Xtrain_sparse
+    svdAnalysis(Xtrain_sparse, Test)
     print time.time() - start_time
     plt.show()
-
-
 
 if __name__ == '__main__':
     main(sys.argv[1:])
