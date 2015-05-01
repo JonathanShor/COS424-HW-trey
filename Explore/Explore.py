@@ -98,7 +98,7 @@ def get_alt_view(fn):
 def main(argv):
     parser = OptionParser()
     parser.add_option("-p", "--path", dest="path", help='read bed data from PATH', metavar='PATH')
-    parser.add_option("-v", type="float", dest="val", default=0, help='percent of train set to hold out')
+    parser.add_option("-v", type="float", dest="val", help='percent of train set to hold out')
     parser.add_option("-o", dest="oldviews", action="store_true", default=False)
     (options, _args) = parser.parse_args()
     path = options.path
@@ -112,8 +112,8 @@ def main(argv):
     if options.val:
         (valset, newtrain) = Utils.make_held_out(train, options.val)
         setID = str(options.val) + time.strftime("%a%H%M")
-        collect_alt_views(newtrain, "TrainTriplets%s" % setID, comments='# Train set %s' % setID)
-        collect_alt_views(valset.tonumpy(), "ValidateTriplets%s" % setID, comments='# Validation set %s' % setID)
+        collect_alt_views(newtrain, path + "TrainTriplets%s.txt" % setID, comments='# Train set %s' % setID)
+        collect_alt_views(valset, path + "ValidateTriplets%s.txt" % setID, comments='# Validation set %s' % setID)
         
 
     if options.oldviews:

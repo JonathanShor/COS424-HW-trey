@@ -8,7 +8,6 @@ from optparse import OptionParser
 import time,sys
 import numpy as np
 import networkx as nx
-import scipy.sparse as sp
 
 # TRAIN_FNAME = "txTripletsCountsNo_e-05.txt"
 TRAIN_FNAME = "txTripletsCountsWGiantOnly.txt"
@@ -39,26 +38,20 @@ def dedup(raw):
 
 def make_held_out(train, alph=0.1):
 # Given a training set (nX3 ndarray of trpl) and percent alph
-# Returns disjoint subsets of train, splitting train into alph% and (1-alph)% subsets
+# Returns disjoint subsets of train, splitting train into size alph% and (1-alph)% subsets
 # Size is taken to be on number of transactions
-    tot = train[:,2].sum()
-    move = int(tot*alph)
-    dims = max(train[:,0].max(), train[:,1].max())
-    valset = sp.lil_matrix((dims, dims))
+    print "train size: %s, alph=%s" % (train[:,2].sum(),alph)
     trainset = train.copy()
-    #Cumulative transaction list for fast binary searching
-    cumtrans = np.array([train[0:x+1,2].sum() for x in range(len(train))])
-    for _ in range(move):
-        transtomove = np.random.randint(0,tot)
-        tomoveind = np.searchsorted(cumtrans, transtomove)
-        valset[trainset[tomoveind,0],trainset[tomoveind,1]] += 1
-        trainset[tomoveind,2] -= 1
-        cumtrans[tomoveind:] -= 1
-        tot -= 1
-        if trainset[tomoveind,2] == 0:
-            trainset = np.delete(trainset,tomoveind, 0)
-            cumtrans = np.delete(cumtrans,tomoveind, 0)
-    return (valset.tocoo(), trainset)
+    valset = np.empty((0,3),dtype='int32')
+    for i in range(len(trainset)):
+        delt = trainset[i,2] * alph
+        delt = int(delt) + (delt % 1 > np.random.rand())
+        if delt:
+            trainset[i,2] -= delt
+            valset = np.append(valset, [[trainset[i,0],trainset[i,1],delt]],0)
+    trainset = trainset[trainset[:,2] != 0]
+    print "trainset: %s  valset: %s total: %s" % (trainset[:,2].sum(), valset[:,2].sum(), trainset[:,2].sum() + valset[:,2].sum())
+    return (valset, trainset)
 
 def main(argv):
     parser = OptionParser()
