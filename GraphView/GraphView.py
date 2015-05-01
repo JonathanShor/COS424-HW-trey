@@ -85,21 +85,23 @@ def common_neighbors(G, fn, t = 0.5):
     else:
         outfile = open(fn + "_t=%s.txt" % t,'w')
     outfile.write("#vertex u; vertex v; their jaccard coef\n")
-#     i = 0
+    i = 0
     print "Starting jacc loop %s with threshold %s" % (time.strftime("%H%M%S"), t)
     for pair in jacc_iter:
         if pair[2] >= t:
             outfile.write("%s %s %f\n" % (pair[0],pair[1],pair[2]))
-#             if pair[0] > i:
+            if pair[0] > i:
 #                 outfile.flush()
-#                 print i
-#                 i+=1
+                print i
+                i+=1
     outfile.close()
 
-def adj_matrix(A1, k):
-# Requires base adjacency matrix A1 and int k to raise A1 to the (matrix) power of
-# TODO: check for existing views on disk of Ak, A(k-1), ... before starting calc
-    return A1 ** k
+def prune_by_degree(G, degs, k):
+# Given a graph G, degree ndarray as produced by collect_degrees,
+# will return G with all nodes of degree <= k removed
+    prunes = degs[:,0][degs[:,3]<=k]
+    G.remove_nodes_from(prunes)
+    return G
 
 def main(argv):
     parser = OptionParser()
@@ -108,10 +110,12 @@ def main(argv):
                       '1 to get SCC sizes, 2 to get trpl txt of biggest SCC, 3 to get trpl txt of all other')
     parser.add_option("-w", type="int", dest="weakcc", default=0, help= \
                       '1 to get WCC sizes, 2 to get trpl txt of biggest WCC, 3 to get trpl txt of all other')
+    parser.add_option("-r", type="int", dest="prune", default=0, help= \
+                      'prune all nodes with degree less than')
     parser.add_option("-d", dest="degrees", action="store_true", default=False)
     parser.add_option("-t", dest="deghist", action="store_true", default=False)
-    parser.add_option("-j", type="float", dest="jacc", default=0.5, help='threshold for Jaccard coefs above which to record')
-    parser.add_option("-a", type="int", dest="adj", default=0, help='adjacency matrix: expects k>1 to produce A^k')
+    parser.add_option("-j", type="float", dest="jacc", default=0, help='threshold for Jaccard coefs above which to record')
+#     parser.add_option("-a", type="int", dest="adj", default=0, help='adjacency matrix: expects k>1 to produce A^k')
 #     WEIGHTED_DEGREES = 'None' #None otherwise
     (options, _args) = parser.parse_args()
     path = options.path
@@ -122,14 +126,22 @@ def main(argv):
     if options.degrees:
         train = get_coo(Utils.read_train_trps_txt(path))
         print "%.2f -- train coo obtained." % (time.time()-start_time)
-    if options.weakcc or options.strongcc or options.deghist or options.jacc:
+    if options.weakcc or options.strongcc or options.deghist or options.prune:
         trainx = Utils.read_train_trps_txt(path, toNX=True)
         print "%.2f -- nx Graph is of len: %s" % (time.time()-start_time, len(trainx))
         print nx.info(trainx)
 
+    if options.prune:
+        degs = ex.get_alt_view(path + 'DegreesView.txt')
+        print "%s -- Got degs, pruning <= %s to begin" % (time.time()-start_time,options.prune)
+        G = prune_by_degree(trainx, degs, options.prune)
+        print "Num nodes now: %s" % G.number_of_nodes()
+        nx.write_weighted_edgelist(G,path + 'PrunedBy%s.txt' % options.prune)
+
     if options.jacc:
+        trainx = nx.read_weighted_edgelist(path + 'PrunedBy5.txt', nodetype=int)
         print "%.2f -- Going for the jacc!" % (time.time() - start_time)
-        common_neighbors(trainx, path + 'JaccardCoefs', t=options.jacc)
+        common_neighbors(trainx, path + 'JaccardCoefsPrune5', t=options.jacc)
 
     if options.degrees:
         ex.collect_alt_views(collect_degrees(train, start_time), path + 'DegreesView.txt', \
@@ -144,14 +156,14 @@ def main(argv):
         plt.hist(traindeghist,bins = len(traindeghist), bottom = 0.1)
         plt.show()
     
-    if 1 < options.adj and options.adj < 10:
-        A1 = np.array(ex.get_alt_view(path + ADJ_FNAME),dtype = 'int')
-        A1 = get_coo(A1).tocsc()
-        print "%.2f -- A1 of type %s obtained." % (time.time()-start_time,type(A1))
-#         Ak = adj_matrix(A1, options.adj).tocoo()
-        Ak = (A1 * A1).tocoo()
-        ex.collect_alt_views(Ak.tonumpy(), 'A%sView.txt' % options.adj, \
-                             "Origin s; destination t; # of directed paths of len %s from s to t" % options.adj)
+#     if 1 < options.adj and options.adj < 10:
+#         A1 = np.array(ex.get_alt_view(path + ADJ_FNAME),dtype = 'int')
+#         A1 = get_coo(A1).tocsc()
+#         print "%.2f -- A1 of type %s obtained." % (time.time()-start_time,type(A1))
+# #         Ak = adj_matrix(A1, options.adj).tocoo()
+#         Ak = (A1 * A1).tocoo()
+#         ex.collect_alt_views(Ak.tonumpy(), 'A%sView.txt' % options.adj, \
+#                              "Origin s; destination t; # of directed paths of len %s from s to t" % options.adj)
 
     if options.weakcc:
         print "%.2f -- Collecting WCCs" % (time.time()-start_time)
