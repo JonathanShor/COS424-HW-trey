@@ -77,14 +77,23 @@ def collect_comps(G, strongly, op, path):
         nx.write_weighted_edgelist(giantcc,path + fn)
     return None
 
-def common_neighbors(G, fn, k=500):
+def common_neighbors(G, fn, t = 0.5):
     G = G.to_undirected()
     jacc_iter = nx.jaccard_coefficient(G)
-    outfile = open(fn,'w',1)
+    if t >= 0.1:
+        outfile = open(fn + "_t=%s.txt" % t,'w',1)
+    else:
+        outfile = open(fn + "_t=%s.txt" % t,'w')
     outfile.write("#vertex u; vertex v; their jaccard coef\n")
+#     i = 0
+    print "Starting jacc loop %s with threshold %s" % (time.strftime("%H%M%S"), t)
     for pair in jacc_iter:
-        if pair[2]>0:
+        if pair[2] >= t:
             outfile.write("%s %s %f\n" % (pair[0],pair[1],pair[2]))
+#             if pair[0] > i:
+#                 outfile.flush()
+#                 print i
+#                 i+=1
     outfile.close()
 
 def adj_matrix(A1, k):
@@ -101,7 +110,7 @@ def main(argv):
                       '1 to get WCC sizes, 2 to get trpl txt of biggest WCC, 3 to get trpl txt of all other')
     parser.add_option("-d", dest="degrees", action="store_true", default=False)
     parser.add_option("-t", dest="deghist", action="store_true", default=False)
-    parser.add_option("-j", dest="jacc", action="store_true", default=False)
+    parser.add_option("-j", type="float", dest="jacc", default=0.5, help='threshold for Jaccard coefs above which to record')
     parser.add_option("-a", type="int", dest="adj", default=0, help='adjacency matrix: expects k>1 to produce A^k')
 #     WEIGHTED_DEGREES = 'None' #None otherwise
     (options, _args) = parser.parse_args()
@@ -120,7 +129,7 @@ def main(argv):
 
     if options.jacc:
         print "%.2f -- Going for the jacc!" % (time.time() - start_time)
-        common_neighbors(trainx, path + 'JaccardCoefs.txt')
+        common_neighbors(trainx, path + 'JaccardCoefs', t=options.jacc)
 
     if options.degrees:
         ex.collect_alt_views(collect_degrees(train, start_time), path + 'DegreesView.txt', \

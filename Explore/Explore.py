@@ -98,31 +98,43 @@ def get_alt_view(fn):
 def main(argv):
     parser = OptionParser()
     parser.add_option("-p", "--path", dest="path", help='read bed data from PATH', metavar='PATH')
+    parser.add_option("-v", type="float", dest="val", default=0, help='percent of train set to hold out')
+    parser.add_option("-o", dest="oldviews", action="store_true", default=False)
     (options, _args) = parser.parse_args()
     path = options.path
     print "PATH = " + path
 
     start_time = time.time()
 
-    train = Utils.read_train_trps_txt(path)
-    #print "Transaction stats"
-    #stats_explore(train[:,2])
-#     collect_alt_views(trans_freq_1way_view(train.copy()), path + 'trans1WayFreqView.txt', \
-#                        'Number of transactions; Count of one way address pairs')
-    print "Collecting SendersRankedView.txt"
-    collect_alt_views(sender_rank_view(train.copy()), path + "SendersRankedView.txt", \
-                      comments="Sender Address; Count of trans sent")
-    print "Collecting ReceiversRankedView.txt"
-    collect_alt_views(sender_rank_view(train.copy(), receivers=True), path + "ReceiversRankedView.txt", \
-                       comments="Receiver Address; Count of trans received")
-    
-    A1 = get_alt_view(path + 'A1View.txt')
-    print "Collecting SendeesRankedView.txt"
-    collect_alt_views(sender_rank_view(A1.copy()), path + "SendeesRankedView.txt", \
-                      comments="Sender Address; Count of addresses sent to")
-    print "Collecting ReceiveesRankedView.txt"
-    collect_alt_views(sender_rank_view(A1.copy(), receivers=True), path + "ReceiveesRankedView.txt", \
-                       comments="Receiver Address; Count of addresses received from")
+    if options.path:
+        train = Utils.read_train_trps_txt(path)
+
+    if options.val:
+        (valset, newtrain) = Utils.make_held_out(train, options.val)
+        setID = str(options.val) + time.strftime("%a%H%M")
+        collect_alt_views(newtrain, "TrainTriplets%s" % setID, comments='# Train set %s' % setID)
+        collect_alt_views(valset.tonumpy(), "ValidateTriplets%s" % setID, comments='# Validation set %s' % setID)
+        
+
+    if options.oldviews:
+        #print "Transaction stats"
+        #stats_explore(train[:,2])
+    #     collect_alt_views(trans_freq_1way_view(train.copy()), path + 'trans1WayFreqView.txt', \
+    #                        'Number of transactions; Count of one way address pairs')
+        print "Collecting SendersRankedView.txt"
+        collect_alt_views(sender_rank_view(train.copy()), path + "SendersRankedView.txt", \
+                          comments="Sender Address; Count of trans sent")
+        print "Collecting ReceiversRankedView.txt"
+        collect_alt_views(sender_rank_view(train.copy(), receivers=True), path + "ReceiversRankedView.txt", \
+                           comments="Receiver Address; Count of trans received")
+        
+        A1 = get_alt_view(path + 'A1View.txt')
+        print "Collecting SendeesRankedView.txt"
+        collect_alt_views(sender_rank_view(A1.copy()), path + "SendeesRankedView.txt", \
+                          comments="Sender Address; Count of addresses sent to")
+        print "Collecting ReceiveesRankedView.txt"
+        collect_alt_views(sender_rank_view(A1.copy(), receivers=True), path + "ReceiveesRankedView.txt", \
+                          comments="Receiver Address; Count of addresses received from")
 
 
     print time.time() - start_time

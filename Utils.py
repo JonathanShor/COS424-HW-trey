@@ -8,6 +8,7 @@ from optparse import OptionParser
 import time,sys
 import numpy as np
 import networkx as nx
+import scipy.sparse as sp
 
 # TRAIN_FNAME = "txTripletsCountsNo_e-05.txt"
 TRAIN_FNAME = "txTripletsCountsWGiantOnly.txt"
@@ -35,8 +36,30 @@ def dedup(raw):
 # NOT TESTED
     keys = list("+".join([str(raw[i][0]),str(raw[i][1])]) for i in range(len(raw)))
     return raw[np.unique(keys,return_index=True)[1]]
-    
-    
+
+def make_held_out(train, alph=0.1):
+# Given a training set (nX3 ndarray of trpl) and percent alph
+# Returns disjoint subsets of train, splitting train into alph% and (1-alph)% subsets
+# Size is taken to be on number of transactions
+    tot = train[:,2].sum()
+    move = int(tot*alph)
+    dims = max(train[:,0].max(), train[:,1].max())
+    valset = sp.lil_matrix((dims, dims))
+    trainset = train.copy()
+    #Cumulative transaction list for fast binary searching
+    cumtrans = np.array([train[0:x+1,2].sum() for x in range(len(train))])
+    for _ in range(move):
+        transtomove = np.random.randint(0,tot)
+        tomoveind = np.searchsorted(cumtrans, transtomove)
+        valset[trainset[tomoveind,0],trainset[tomoveind,1]] += 1
+        trainset[tomoveind,2] -= 1
+        cumtrans[tomoveind:] -= 1
+        tot -= 1
+        if trainset[tomoveind,2] == 0:
+            trainset = np.delete(trainset,tomoveind, 0)
+            cumtrans = np.delete(cumtrans,tomoveind, 0)
+    return (valset.tocoo(), trainset)
+
 def main(argv):
     parser = OptionParser()
     parser.add_option("-p", "--path", dest="path", help='read data from PATH', metavar='PATH')
@@ -50,7 +73,7 @@ def main(argv):
     print "Test.shape = %s" % str(test.shape)
     train = read_train_trps_txt(path)
     print "Train.shape = %s" % str(train.shape)
-    
+
 #     ex.collect_alt_views(dedup(test), path + 'DEDUPtestTriplets.txt', \
 #                               comments='Duplicates entries removed.')
 #     ex.collect_alt_views(dedup(train), path + 'DEDUPtxTripletsCounts.txt', \
