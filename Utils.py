@@ -19,7 +19,7 @@ def read_train_trps_txt(path, toNX=False, skip = 0):
 # Can be given a number of rows to skip, ndarray case only
     if toNX:
         return nx.read_weighted_edgelist(path + TRAIN_FNAME, create_using=nx.DiGraph(), nodetype=int)
-    return np.loadtxt(path + TRAIN_FNAME, dtype='int32', skiprows = skip)
+    return np.loadtxt(path + TRAIN_FNAME, skiprows = skip)
 
 def read_test_trps_txt(path, toNX=False, skip = 0):
 # Accepts path to TEST_FNAME
@@ -27,7 +27,7 @@ def read_test_trps_txt(path, toNX=False, skip = 0):
 # Can be given a number of rows to skip, ndarray case only
     if toNX:
         return nx.read_weighted_edgelist(path + TEST_FNAME, create_using=nx.DiGraph(), nodetype=int)
-    return np.loadtxt(path + TEST_FNAME, dtype='int32', skiprows = skip)
+    return np.loadtxt(path + TEST_FNAME, skiprows = skip)
 
 def dedup(raw):
 # Takes raw Nx3 triplet format matrix, checks for duplicate sender-receiver entries

@@ -14,34 +14,25 @@ import matplotlib.pyplot as plt
 # Calculate performance metrics.
 # Input:
 #       test_entries: The sparse matrix of testing probes
-#       matrix: The predicted matrix of transactions
+#       test_predictions: The predicted matrix of testing probes
 #
 # Output: FPR, TPR, AUC, F1, P, R
 ###############################################################################
-def performance_metrics(test_entries, matrix):
+def performance_metrics(test_entries, test_predictions):
     # Gather and process data
-    matrix_prediction = constrain(matrix)
+    predictions = constrain(test_predictions)
     test_labels = test_entries[:,2]
-    predictions = []
-    for i in range(test_labels.shape[0]):
-        sender = test_entries[i,0]
-        receiver = test_entries[i,1]
-        predictions[i] = matrix_prediction[sender, receiver]
-    predictions = np.array(predictions)
 
     # roc_curve returns false-positive and true-positive rates
     (fpr, tpr, _) = roc_curve(test_labels, predictions)
 
     # AUC (area under ROC curve)
-    auc = auc(test_labels, predictions)
-
-    # f1 (combination of precision and recall)
-    f1 = f1_score(test_labels, predictions)
+    aucScore = auc(fpr, tpr)
 
     # precision/recall estimates
     (precision, recall, _) = precision_recall_curve(test_labels, predictions)
 
-    return (fpr, tpr, auc, f1, precision, recall)
+    return (fpr, tpr, aucScore, precision, recall)
 
 ###############################################################################
 # Helper method to change values to weighted probabilities of sender i giving
@@ -65,33 +56,55 @@ def makeWeightedProbabilities(matrix):
 # prediction above 1 is taken as truth. Any negative values are treated as
 # absolute no (0). And in between (0,1) are probabilities.
 ###############################################################################
-def constrain(matrix):
-    rows = matrix.shape[0]
-    cols = matrix.shape[1]
-    for i in range(rows):
-        for j in range(cols):
-            if (matrix[i, j] > 1):
-                matrix[i, j] = 1
-            elif (matrix[i, j] < 0):
-                matrix[i, j] = 0
+def constrain(array):
+    for i in range(len(array)):
+        if (array[i] > 1):
+            array[i] = 1
+        elif (array[i] < 0):
+            array[i] = 0
 
-    return (matrix)
+    return (array)
 
 ###############################################################################
 # Helper method to plot the results of the ROC curve.
 ###############################################################################
 def plotROC(fpr, tpr):
+    #print fpr.shape
+    print len(fpr)
     ax = plt.figure()
     colors = ['b','g','r','c','m','y','k']
+    labels = ['Standard', 'Binary', 'Binned']
     for c in range(len(fpr)):
         (this_fpr, this_tpr) = (fpr[c], tpr[c])
-        plt.plot(this_fpr, this_tpr, colors[c] + '-')
+        plt.plot(this_fpr, this_tpr, colors[c] + '-', label = labels[c])
 
     x = np.linspace(0,1,num = len(fpr))
     plt.plot(x, x, '--', color = (.6, .6, .6), label = 'Luck')
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
     plt.title('Reciever Operating Characteristic')
+    plt.legend(loc = 'best', prop={'size':10})
+
+    return
+
+###############################################################################
+# Helper method to plot the results of the PR curve.
+###############################################################################
+def plotPR(precision, recall):
+    #print fpr.shape
+    print len(precision)
+    ax = plt.figure()
+    colors = ['b','g','r','c','m','y','k']
+    labels = ['Standard', 'Binary', 'Binned']
+    for c in range(len(precision)):
+        (this_pr, this_r) = (precision[c], recall[c])
+        plt.plot(this_pr, this_r, colors[c] + '-', label = labels[c])
+
+    x = np.linspace(0,1,num = len(precision))
+    plt.plot(x, x, '--', color = (.6, .6, .6), label = 'Luck')
+    plt.xlabel('Precision')
+    plt.ylabel('Recall')
+    plt.title('Precision - Recall Curve')
     plt.legend(loc = 'best', prop={'size':10})
 
     return
