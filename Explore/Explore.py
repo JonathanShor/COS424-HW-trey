@@ -100,6 +100,10 @@ def main(argv):
     parser.add_option("-p", "--path", dest="path", help='read bed data from PATH', metavar='PATH')
     parser.add_option("-v", type="float", dest="val", help='percent of train set to hold out')
     parser.add_option("-o", dest="oldviews", action="store_true", default=False)
+    parser.add_option("-t", type='int', dest="prunetrans", default=0, help= \
+                      "prune all one-way trans less than k")
+    parser.add_option("-T", type='int', dest="pruneTrans", default=0, help= \
+                      "prune all two-way trans less than k")
     (options, _args) = parser.parse_args()
     path = options.path
     print "PATH = " + path
@@ -128,13 +132,33 @@ def main(argv):
         collect_alt_views(sender_rank_view(train.copy(), receivers=True), path + "ReceiversRankedView.txt", \
                            comments="Receiver Address; Count of trans received")
         
-        A1 = get_alt_view(path + 'A1View.txt')
+        A1 = train.copy()
+        A1[:,2] = 1
         print "Collecting SendeesRankedView.txt"
         collect_alt_views(sender_rank_view(A1.copy()), path + "SendeesRankedView.txt", \
                           comments="Sender Address; Count of addresses sent to")
         print "Collecting ReceiveesRankedView.txt"
         collect_alt_views(sender_rank_view(A1.copy(), receivers=True), path + "ReceiveesRankedView.txt", \
                           comments="Receiver Address; Count of addresses received from")
+
+    if options.prunetrans:
+        # Remove arcs with weight < k
+        print "len(train): %s" % len(train)
+        prunedtrain = train[train[:,2]>=options.prunetrans]
+        print "len(train): %s, k= %s, train[:,2].min() = %s" % (len(prunedtrain), options.prunetrans, prunedtrain[:,2].min())
+        collect_alt_views(prunedtrain,path +  "Pruned1Trans_k=%s_%s" % (options.prunetrans, Utils.TRAIN_FNAME))
+    if options.pruneTrans:
+        # Remove arcs such that the weight of (v,w) + (w,v) < k
+        k = options.pruneTrans
+        print "len(train): %s" % len(train)
+        trainlil = Utils.get_coo(train).tolil()
+        prunedtrain = train.copy()
+        for r in prunedtrain:
+            if r[2] + trainlil[r[0],r[1]] < k:
+                r[2] = 0
+        prunedtrain = prunedtrain[prunedtrain[:,2] != 0]
+        print "len(train): %s, k= %s, train[:,2].sum() = %s" % (len(prunedtrain), k, prunedtrain[:,2].sum())
+        collect_alt_views(prunedtrain,path +  "Pruned2Trans_k=%s_%s" % (k, Utils.TRAIN_FNAME))
 
 
     print time.time() - start_time
