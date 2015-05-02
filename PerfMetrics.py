@@ -73,7 +73,7 @@ def plotROC(fpr, tpr):
     print len(fpr)
     ax = plt.figure()
     colors = ['b','g','r','c','m','y','k']
-    labels = ['Standard', 'Binary', 'Binned']
+    labels = ['Standard', 'Binned', 'Binnary']
     for c in range(len(fpr)):
         (this_fpr, this_tpr) = (fpr[c], tpr[c])
         plt.plot(this_fpr, this_tpr, colors[c] + '-', label = labels[c])
@@ -95,15 +95,12 @@ def plotPR(precision, recall):
     print len(precision)
     ax = plt.figure()
     colors = ['b','g','r','c','m','y','k']
-    labels = ['Standard', 'Binary', 'Binned']
+    labels = ['Standard', 'Binned', 'Binary']
     for c in range(len(precision)):
         (this_pr, this_r) = (precision[c], recall[c])
-        plt.plot(this_pr, this_r, colors[c] + '-', label = labels[c])
-
-    x = np.linspace(0,1,num = len(precision))
-    plt.plot(x, x, '--', color = (.6, .6, .6), label = 'Luck')
-    plt.xlabel('Precision')
-    plt.ylabel('Recall')
+        plt.plot(this_r, this_pr, colors[c] + '-', label = labels[c])
+    plt.xlabel('Recall')
+    plt.ylabel('Precision')
     plt.title('Precision - Recall Curve')
     plt.legend(loc = 'best', prop={'size':10})
 

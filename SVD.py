@@ -62,6 +62,9 @@ def svdAnalysis(Xsparse, Test):
     plt.figure()
     (n, bins, patches) = plt.hist(Xsparse.data, 30, normed = 1)
     plt.yscale('log')
+    plt.title('Distribution of Transaction Amounts')
+    plt.xlabel('Number of Transactions')
+    plt.ylabel('Density')
 
     # Compute the details on a SVD decomposition - the explained variance
     # ratios, the singular values themselves, and a 2D projection for plotting.
@@ -69,12 +72,19 @@ def svdAnalysis(Xsparse, Test):
     plt.figure()
     plt.plot(np.fliplr([singular_vals])[0], 'bo-')
     plt.title('Singular Values: Decreasing Magnitude')
+    plt.xlabel('Dimension Number')
+    plt.ylabel('Singular Value')
     plt.figure()
     plt.plot(variance_ratios, 'bo-')
     plt.title('Singular Values: Decreasing Explained Variance')
     plt.figure()
+    plt.xlabel('Dimension Number')
+    plt.ylabel('Explained Variance (%)')
     plt.scatter(X2d[:,0], X2d[:,1])
     plt.title('2D Projection of Transaction Data')
+    plt.xlabel('Principal Component 1')
+    plt.ylabel('Principal Component 2')
+
 
     fprs = []
     tprs = []
@@ -93,7 +103,7 @@ def svdAnalysis(Xsparse, Test):
     append_lists(list_of_metrics, [fpr, tpr, auc, precision, recall])
 
     print ("doing binary method")
-    binaryXsparse = binarize(Xsparse);
+    binaryXsparse = bin_a_rize(Xsparse, 12);
     binaryXpredict = doSVD(binaryXsparse, Test, 12)
     # Compute errors
     (fpr, tpr, auc, precision, recall) = \
@@ -101,7 +111,7 @@ def svdAnalysis(Xsparse, Test):
     append_lists(list_of_metrics, [fpr, tpr, auc, precision, recall])
 
     print ("doing bins method")
-    binnedXsparse = bin_a_rize(Xsparse,12)
+    binnedXsparse = binarize(Xsparse)
     binnedXpredict = doSVD(binnedXsparse, Test, 12)
     (fpr, tpr, auc, precision, recall) = \
         PerfMetrics.performance_metrics(Test, binnedXpredict)
@@ -126,7 +136,7 @@ def append_lists(list_lists, list_vals):
 # Count transactions as either true or false.
 ###############################################################################
 def binarize(Xsparse):
-    X_binary = sp.coo_matrix(Xsparse)
+    X_binary = Xsparse.tocoo()
     X_binary.data[:] = 1
     return (X_binary)
 
@@ -136,10 +146,12 @@ def binarize(Xsparse):
 # bin counts at 1. 0 is the auto bin for the sparse entries.
 ###############################################################################
 def bin_a_rize(Xsparse, n):
-    X_bins = sp.coo_matrix(Xsparse)
+    X_bins = Xsparse.tocoo()
     values = X_bins.data
+    print values
     for i in range(values.shape[0]):
         bin = math.ceil(math.log(values[i])) + 1
+        print bin
         if (bin > n):
             bin = n
         values[i] = bin
