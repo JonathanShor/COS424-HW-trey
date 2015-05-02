@@ -8,18 +8,23 @@ from optparse import OptionParser
 import time,sys
 import numpy as np
 import networkx as nx
+import scipy.sparse as sp
 
 # TRAIN_FNAME = "txTripletsCountsNo_e-05.txt"
 TRAIN_FNAME = "txTripletsCountsWGiantOnly.txt"
 TEST_FNAME = "testTriplets.txt"
 
-def read_train_trps_txt(path, toNX=False, skip = 0):
+def read_train_trps_txt(path, toNX=False, skip = 0, fn = ''):
 # Accepts path to TRAIN_FNAME
 # If toNX, returns a nx.DiGraph, otherwise returns a ndarray
 # Can be given a number of rows to skip, ndarray case only
+    if len(fn)>0:
+        fname = fn
+    else:
+        fname = TRAIN_FNAME
     if toNX:
-        return nx.read_weighted_edgelist(path + TRAIN_FNAME, create_using=nx.DiGraph(), nodetype=int)
-    return np.loadtxt(path + TRAIN_FNAME, skiprows = skip)
+        return nx.read_weighted_edgelist(path + fname, create_using=nx.DiGraph(), nodetype=int)
+    return np.loadtxt(path + fname, dtype='int32', skiprows = skip)
 
 def read_test_trps_txt(path, toNX=False, skip = 0):
 # Accepts path to TEST_FNAME
@@ -27,7 +32,12 @@ def read_test_trps_txt(path, toNX=False, skip = 0):
 # Can be given a number of rows to skip, ndarray case only
     if toNX:
         return nx.read_weighted_edgelist(path + TEST_FNAME, create_using=nx.DiGraph(), nodetype=int)
-    return np.loadtxt(path + TEST_FNAME, skiprows = skip)
+    return np.loadtxt(path + TEST_FNAME, dtype='int32', skiprows = skip)
+
+def get_coo(trp_raw):
+# Given nX3 raw trp ndarray trp_raw, return a sparse.coo_matrix of minimal square shape
+    dim = max(trp_raw[:,0].max(),trp_raw[:,1].max()) + 1
+    return sp.coo_matrix((trp_raw[:,2],(trp_raw[:,0],trp_raw[:,1])),shape=(dim,dim))
 
 def dedup(raw):
 # Takes raw Nx3 triplet format matrix, checks for duplicate sender-receiver entries
@@ -62,10 +72,11 @@ def main(argv):
 
     start_time = time.time()
 
-    test = read_test_trps_txt(path)
-    print "Test.shape = %s" % str(test.shape)
-    train = read_train_trps_txt(path)
-    print "Train.shape = %s" % str(train.shape)
+#     test = read_test_trps_txt(path)
+#     print "Test.shape = %s" % str(test.shape)
+    if options.path:
+        train = read_train_trps_txt(path)
+        print "Train.shape = %s" % str(train.shape)
 
 #     ex.collect_alt_views(dedup(test), path + 'DEDUPtestTriplets.txt', \
 #                               comments='Duplicates entries removed.')

@@ -4,21 +4,22 @@ Created on Apr 20, 2015
 @author: jonathanshor
 '''
 import time, sys
+import os.path
 from optparse import OptionParser
 import Utils
 from Explore import Explore as ex
-# import scipy.sparse.csgraph as csg
-import scipy.sparse as sp
 import numpy as np
 import networkx as nx
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
 ADJ_FNAME = "A1View.txt"
+INOUT_BIAS_CAP = 1
 
 def get_coo(trp_raw):
 # Given nX3 raw trp ndarray trp_raw, return a sparse.coo_matrix of minimal square shape
-    dim = max(trp_raw[:,0].max(),trp_raw[:,1].max()) + 1
-    return sp.coo_matrix((trp_raw[:,2],(trp_raw[:,0],trp_raw[:,1])),shape=(dim,dim))
+#     dim = max(trp_raw[:,0].max(),trp_raw[:,1].max()) + 1
+#     return sp.coo_matrix((trp_raw[:,2],(trp_raw[:,0],trp_raw[:,1])),shape=(dim,dim))
+    return Utils.get_coo(trp_raw)
 
 def collect_degrees(coo, start_time = time.time()):
 # Return 4xN ndarray of degrees, N = # of nodes
@@ -78,23 +79,32 @@ def collect_comps(G, strongly, op, path):
     return None
 
 def common_neighbors(G, fn, t = 0.5):
+#     fn = fn + "_t=%s.txt" % t
     G = G.to_undirected()
-    jacc_iter = nx.jaccard_coefficient(G)
-    if t >= 0.1:
-        outfile = open(fn + "_t=%s.txt" % t,'w',1)
+    if os.path.isfile(fn) :
+        H = G.copy()
+        found = nx.read_edgelist(fn, nodetype=int, data=False)
+        H.add_edges_from(found.edges_iter())
+        jacc_iter = nx.jaccard_coefficient(G, nx.non_edges(H))
+        print "Appending to %s" % fn
+        outfile = open(fn,'a',1)
+        i = found.number_of_nodes()
     else:
-        outfile = open(fn + "_t=%s.txt" % t,'w')
+        jacc_iter = nx.jaccard_coefficient(G)
+        outfile = open(fn,'w',1)
+        i = 0
     outfile.write("#vertex u; vertex v; their jaccard coef\n")
-    i = 0
-    print "Starting jacc loop %s with threshold %s" % (time.strftime("%H%M%S"), t)
+    cur = -1
+    print "Starting jacc loop %s with threshold %s" % (time.strftime("%H:%M:%S"), t)
     for pair in jacc_iter:
         if pair[2] >= t:
             outfile.write("%s %s %f\n" % (pair[0],pair[1],pair[2]))
-            if pair[0] > i:
-#                 outfile.flush()
-                print i
-                i+=1
+            if pair[0] != cur:
+                cur = pair[0]
+                i += 1
+                print "%s: %s" % (i, cur)
     outfile.close()
+    print "Done writing %s" % (fn)
 
 def prune_by_degree(G, degs, k):
 # Given a graph G, degree ndarray as produced by collect_degrees,
@@ -103,9 +113,39 @@ def prune_by_degree(G, degs, k):
     G.remove_nodes_from(prunes)
     return G
 
+# def prune_by_trans_count(G, trans, k):
+# # Given a graph G, trans count ndarray as produced by collect_degrees,
+# # will return G with all nodes of degree <= k removed
+#     prunes = trans[:,0][trans[:,3]<=k]
+#     G.remove_nodes_from(prunes)
+#     return G
+
+def make_predG_from_jacc(undir_jaccs, dirG, testG):
+# Given an undirGraph of jaccard coeffs (produced from the undirected version of dirG)
+# the original digraph dirG, and the testG digraph to test against, 
+# Return predicted digraph predG with arcs matching testG, each with the predicted lilekihood 
+    predG = nx.DiGraph()
+    for (u,v) in testG.edges_iter():
+        if undir_jaccs.has_edge(u,v):
+            if dirG.has_edge(u,v):
+                outw = dirG[u][v]['weight']
+            else:
+                outw = 0
+            if dirG.has_edge(v,u):
+                inw = dirG[v][u]['weight']
+            else:
+                inw = 0
+            bias = min(INOUT_BIAS_CAP, outw/((outw+inw)/2))
+            predw =undir_jaccs[u][v]['weight'] * bias 
+        else:
+            predw = 0
+        predG.add_edge(u, v, weight=predw)
+    return predG
+
 def main(argv):
     parser = OptionParser()
-    parser.add_option("-p", "--path", dest="path", help='read bed data from PATH', metavar='PATH')
+    parser.add_option("-p", "--path", dest="path", help='read data from PATH', metavar='PATH')
+    parser.add_option("-f", "--file", type="string", dest="fil", default='', help='file to work with')
     parser.add_option("-s", type="int", dest="strongcc", default=0, help= \
                       '1 to get SCC sizes, 2 to get trpl txt of biggest SCC, 3 to get trpl txt of all other')
     parser.add_option("-w", type="int", dest="weakcc", default=0, help= \
@@ -113,23 +153,27 @@ def main(argv):
     parser.add_option("-r", type="int", dest="prune", default=0, help= \
                       'prune all nodes with degree less than')
     parser.add_option("-d", dest="degrees", action="store_true", default=False)
-    parser.add_option("-t", dest="deghist", action="store_true", default=False)
-    parser.add_option("-j", type="float", dest="jacc", default=0, help='threshold for Jaccard coefs above which to record')
+    parser.add_option("-j", type="float", dest="jacc", default=-1, help='threshold for Jaccard coefs above which to record')
 #     parser.add_option("-a", type="int", dest="adj", default=0, help='adjacency matrix: expects k>1 to produce A^k')
 #     WEIGHTED_DEGREES = 'None' #None otherwise
     (options, _args) = parser.parse_args()
     path = options.path
     print "PATH = " + path
+    print "FILE = " + options.fil
 
     start_time = time.time()
 
     if options.degrees:
-        train = get_coo(Utils.read_train_trps_txt(path))
+        train = Utils.get_coo(Utils.read_train_trps_txt(path,fn=options.fil))
         print "%.2f -- train coo obtained." % (time.time()-start_time)
-    if options.weakcc or options.strongcc or options.deghist or options.prune:
-        trainx = Utils.read_train_trps_txt(path, toNX=True)
+    if options.weakcc or options.strongcc or options.prune:
+        trainx = Utils.read_train_trps_txt(path, toNX=True, fn=options.fil)
         print "%.2f -- nx Graph is of len: %s" % (time.time()-start_time, len(trainx))
         print nx.info(trainx)
+
+    if options.degrees:
+        ex.collect_alt_views(collect_degrees(train, start_time), path + 'DegreesView.txt', \
+                             comments= "Vertex; count of out edges; count of in edges; Total adj edges")
 
     if options.prune:
         degs = ex.get_alt_view(path + 'DegreesView.txt')
@@ -138,23 +182,23 @@ def main(argv):
         print "Num nodes now: %s" % G.number_of_nodes()
         nx.write_weighted_edgelist(G,path + 'PrunedBy%s.txt' % options.prune)
 
-    if options.jacc:
-        trainx = nx.read_weighted_edgelist(path + 'PrunedBy5.txt', nodetype=int)
+    if options.jacc >= 0:
+        fn_base = options.fil
+        trainx = nx.read_weighted_edgelist(path + fn_base, nodetype=int)
         print "%.2f -- Going for the jacc!" % (time.time() - start_time)
-        common_neighbors(trainx, path + 'JaccardCoefsPrune5', t=options.jacc)
+#         common_neighbors(trainx, path + 'JaccardCoefs', t=options.jacc)
+        t=options.jacc
+        common_neighbors(trainx, path + 'JaccardCoefs_t=%s' % t + fn_base, t=t)
 
-    if options.degrees:
-        ex.collect_alt_views(collect_degrees(train, start_time), path + 'DegreesView.txt', \
-                             comments= "Vertex; count of out edges; count of in edges; Total adj edges")
 
-    if options.deghist:
-#         plt.figure()
-        traindeghist = nx.degree_histogram(trainx)
-        print "degree hist found"
-        plt.yscale('log')
-        plt.xscale('log')
-        plt.hist(traindeghist,bins = len(traindeghist), bottom = 0.1)
-        plt.show()
+#     if options.deghist:
+# #         plt.figure()
+#         traindeghist = nx.degree_histogram(trainx)
+#         print "degree hist found"
+#         plt.yscale('log')
+#         plt.xscale('log')
+#         plt.hist(traindeghist,bins = len(traindeghist), bottom = 0.1)
+#         plt.show()
     
 #     if 1 < options.adj and options.adj < 10:
 #         A1 = np.array(ex.get_alt_view(path + ADJ_FNAME),dtype = 'int')
