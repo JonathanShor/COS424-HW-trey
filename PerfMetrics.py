@@ -48,7 +48,6 @@ def makeWeightedProbabilities(array):
 
     return (array)
 
-
 ###############################################################################
 # Helper method that just take the real value of the matrix. Any transaction
 # prediction above 1 is taken as truth. Any negative values are treated as
