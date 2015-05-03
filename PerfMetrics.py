@@ -38,18 +38,15 @@ def performance_metrics(test_entries, test_predictions):
 # Helper method to change values to weighted probabilities of sender i giving
 # payment to receiver j.
 ###############################################################################
-def makeWeightedProbabilities(matrix):
-    rows = matrix.shape[0]
-    cols = matrix.shape[1]
-    col_sums = matrix.sum(1)
-    for i in range(rows):
-        sum = col[i,0]
-        if (sum == 0):
-            continue
-        for j in range(cols):
-            matrix[i, j] = matrix[i, j]/sum
+def makeWeightedProbabilities(array):
+    sum = array.sum()
+    for i in range(len(array)):
+        array[i] = array[i]/sum
+        if (array[i] < 0):
+            array[i] = 0
 
-    return (matrix)
+
+    return (array)
 
 ###############################################################################
 # Helper method that just take the real value of the matrix. Any transaction
