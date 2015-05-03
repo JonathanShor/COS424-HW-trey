@@ -2,3 +2,5 @@
 /.pydevproject
 /Utils.pyc
 /.DS_Store
+/PerfMetrics.pyc
+/SVD.pyc

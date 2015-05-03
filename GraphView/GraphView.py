@@ -10,16 +10,22 @@ import Utils
 from Explore import Explore as ex
 import numpy as np
 import networkx as nx
-# import matplotlib.pyplot as plt
-
-ADJ_FNAME = "A1View.txt"
-INOUT_BIAS_CAP = 1
+import PerfMetrics
 
 def get_coo(trp_raw):
+# Depreciated here
 # Given nX3 raw trp ndarray trp_raw, return a sparse.coo_matrix of minimal square shape
-#     dim = max(trp_raw[:,0].max(),trp_raw[:,1].max()) + 1
-#     return sp.coo_matrix((trp_raw[:,2],(trp_raw[:,0],trp_raw[:,1])),shape=(dim,dim))
     return Utils.get_coo(trp_raw)
+
+###############################################################################
+# Update list of metrics.
+###############################################################################
+def append_lists(list_lists, list_vals):
+    for i in range(len(list_lists)):
+        list_lists[i].append(list_vals[i])
+
+    return list_lists
+
 
 def collect_degrees(coo, start_time = time.time()):
 # Return 4xN ndarray of degrees, N = # of nodes
@@ -79,7 +85,6 @@ def collect_comps(G, strongly, op, path):
     return None
 
 def common_neighbors(G, fn, t = 0.5):
-#     fn = fn + "_t=%s.txt" % t
     G = G.to_undirected()
     if os.path.isfile(fn) :
         H = G.copy()
@@ -113,13 +118,6 @@ def prune_by_degree(G, degs, k):
     G.remove_nodes_from(prunes)
     return G
 
-# def prune_by_trans_count(G, trans, k):
-# # Given a graph G, trans count ndarray as produced by collect_degrees,
-# # will return G with all nodes of degree <= k removed
-#     prunes = trans[:,0][trans[:,3]<=k]
-#     G.remove_nodes_from(prunes)
-#     return G
-
 def make_predG_from_jacc(undir_jaccs, dirG, testG):
 # Given an undirGraph of jaccard coeffs (produced from the undirected version of dirG)
 # the original digraph dirG, and the testG digraph to test against, 
@@ -127,20 +125,48 @@ def make_predG_from_jacc(undir_jaccs, dirG, testG):
     predG = nx.DiGraph()
     for (u,v) in testG.edges_iter():
         if undir_jaccs.has_edge(u,v):
-            if dirG.has_edge(u,v):
-                outw = dirG[u][v]['weight']
-            else:
-                outw = 0
-            if dirG.has_edge(v,u):
-                inw = dirG[v][u]['weight']
-            else:
-                inw = 0
-            bias = min(INOUT_BIAS_CAP, outw/((outw+inw)/2))
+            bias = 1
             predw =undir_jaccs[u][v]['weight'] * bias 
         else:
             predw = 0
         predG.add_edge(u, v, weight=predw)
     return predG
+
+def make_jacc_predG(dirG, testG):
+# Given the original digraph dirG, and the testG digraph to test against, 
+# Return predicted digraph predG with arcs matching testG,
+# each with the predicted lilekihood according to Jaccard coeff
+    undG = dirG.to_undirected()
+    undir_jaccs = nx.Graph() 
+    undir_jaccs.add_weighted_edges_from(nx.jaccard_coefficient(undG, testG.edges_iter()))
+    return make_predG_from_jacc(undir_jaccs, dirG, testG)
+
+def make_adamic_adar_index_predG(dirG, testG):
+    undG = dirG.to_undirected()
+    undir_AAs = nx.Graph() 
+    undir_AAs.add_weighted_edges_from(nx.adamic_adar_index(undG, testG.edges_iter()))
+    return make_predG_from_jacc(undir_AAs, dirG, testG)
+
+def synced_array(arr, G):
+# Given ndarray edgelist array and graph G,
+# Return G as array equalling arr in columns 0 and 1
+    sync = np.array(arr.copy(), dtype='float')
+    for r in sync:
+        r[2] = G[r[0]][r[1]]['weight']
+    return sync 
+
+def inv_shortest(pairs, G):
+#     preds = np.empty_like(pairs,dtype='float') + [[0,0,0]]
+    preds = np.empty((len(pairs),3),dtype='float')
+    print "pairs.shope: %s, preds.shape: %s" % (pairs.shape, preds.shape)
+    preds[:,0] = pairs[:,0]
+    preds[:,1] = pairs[:,1]
+    for r in preds:
+        try:
+            r[2] = 1./nx.shortest_path_length(G, int(r[0]),int(r[1]))
+        except nx.NetworkXNoPath:
+            r[2] = 0
+    return preds
 
 def main(argv):
     parser = OptionParser()
@@ -153,15 +179,52 @@ def main(argv):
     parser.add_option("-r", type="int", dest="prune", default=0, help= \
                       'prune all nodes with degree less than')
     parser.add_option("-d", dest="degrees", action="store_true", default=False)
+    parser.add_option("-J", dest="jaccPreds", action="store_true", default=False)
+    parser.add_option("-A", dest="AAPreds", action="store_true", default=False)
+    parser.add_option("-P", dest="runperf", action="store_true", default=False)
     parser.add_option("-j", type="float", dest="jacc", default=-1, help='threshold for Jaccard coefs above which to record')
-#     parser.add_option("-a", type="int", dest="adj", default=0, help='adjacency matrix: expects k>1 to produce A^k')
-#     WEIGHTED_DEGREES = 'None' #None otherwise
     (options, _args) = parser.parse_args()
     path = options.path
     print "PATH = " + path
     print "FILE = " + options.fil
 
     start_time = time.time()
+
+    if options.runperf:
+        list_of_metrics = [[],[],[],[],[]]
+        test = Utils.read_test_trps_txt(path)
+        trainx = Utils.read_train_trps_txt(path, toNX=True)
+
+        #Inv shortest path directed
+        preds = inv_shortest(test, trainx)
+        (fpr, tpr, aucScore, precision, recall) = PerfMetrics.performance_metrics(test, preds[:,2])
+        append_lists(list_of_metrics, [fpr, tpr, aucScore, precision, recall])
+        
+        #Inv shortest path reverse directed
+        preds = inv_shortest(test, trainx.reverse(copy=False))
+        (fpr, tpr, aucScore, precision, recall) = PerfMetrics.performance_metrics(test, preds[:,2])
+        append_lists(list_of_metrics, [fpr, tpr, aucScore, precision, recall])
+
+        #Jaccard coefficients
+        preds = synced_array(test,nx.read_weighted_edgelist(path + 'jacc_preds.txt', nodetype=int))
+        (fpr, tpr, aucScore, precision, recall) = PerfMetrics.performance_metrics(test, preds[:,2])
+        append_lists(list_of_metrics, [fpr, tpr, aucScore, precision, recall])
+
+        print "aucs: %s" % list_of_metrics[2]
+        PerfMetrics.plotROCGraph(list_of_metrics[0],list_of_metrics[1])
+        PerfMetrics.plotPRGraph(list_of_metrics[3], list_of_metrics[4])
+
+    if options.jaccPreds:
+        train = Utils.read_train_trps_txt(path, toNX=True, fn='train.txt')
+        test = Utils.read_train_trps_txt(path, toNX=True, fn='test.txt')
+        preds = make_jacc_predG(train, test)
+        nx.write_weighted_edgelist(preds,path + 'jacc_preds.txt')
+
+    if options.AAPreds:
+        train = Utils.read_train_trps_txt(path, toNX=True, fn='train.txt')
+        test = Utils.read_train_trps_txt(path, toNX=True, fn='test.txt')
+        preds = make_adamic_adar_index_predG(train, test)
+        nx.write_weighted_edgelist(preds,path + 'AA_preds.txt')
 
     if options.degrees:
         train = Utils.get_coo(Utils.read_train_trps_txt(path,fn=options.fil))
@@ -189,25 +252,6 @@ def main(argv):
 #         common_neighbors(trainx, path + 'JaccardCoefs', t=options.jacc)
         t=options.jacc
         common_neighbors(trainx, path + 'JaccardCoefs_t=%s' % t + fn_base, t=t)
-
-
-#     if options.deghist:
-# #         plt.figure()
-#         traindeghist = nx.degree_histogram(trainx)
-#         print "degree hist found"
-#         plt.yscale('log')
-#         plt.xscale('log')
-#         plt.hist(traindeghist,bins = len(traindeghist), bottom = 0.1)
-#         plt.show()
-    
-#     if 1 < options.adj and options.adj < 10:
-#         A1 = np.array(ex.get_alt_view(path + ADJ_FNAME),dtype = 'int')
-#         A1 = get_coo(A1).tocsc()
-#         print "%.2f -- A1 of type %s obtained." % (time.time()-start_time,type(A1))
-# #         Ak = adj_matrix(A1, options.adj).tocoo()
-#         Ak = (A1 * A1).tocoo()
-#         ex.collect_alt_views(Ak.tonumpy(), 'A%sView.txt' % options.adj, \
-#                              "Origin s; destination t; # of directed paths of len %s from s to t" % options.adj)
 
     if options.weakcc:
         print "%.2f -- Collecting WCCs" % (time.time()-start_time)

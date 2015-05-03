@@ -39,13 +39,6 @@ def get_coo(trp_raw):
     dim = max(trp_raw[:,0].max(),trp_raw[:,1].max()) + 1
     return sp.coo_matrix((trp_raw[:,2],(trp_raw[:,0],trp_raw[:,1])),shape=(dim,dim))
 
-def dedup(raw):
-# Takes raw Nx3 triplet format matrix, checks for duplicate sender-receiver entries
-# Returns Mx3 ndarray, with the dup entries removed
-# NOT TESTED
-    keys = list("+".join([str(raw[i][0]),str(raw[i][1])]) for i in range(len(raw)))
-    return raw[np.unique(keys,return_index=True)[1]]
-
 def make_held_out(train, alph=0.1):
 # Given a training set (nX3 ndarray of trpl) and percent alph
 # Returns disjoint subsets of train, splitting train into size alph% and (1-alph)% subsets
@@ -72,17 +65,9 @@ def main(argv):
 
     start_time = time.time()
 
-#     test = read_test_trps_txt(path)
-#     print "Test.shape = %s" % str(test.shape)
     if options.path:
         train = read_train_trps_txt(path)
         print "Train.shape = %s" % str(train.shape)
-
-#     ex.collect_alt_views(dedup(test), path + 'DEDUPtestTriplets.txt', \
-#                               comments='Duplicates entries removed.')
-#     ex.collect_alt_views(dedup(train), path + 'DEDUPtxTripletsCounts.txt', \
-#                               comments='Duplicates entries removed.')
-
 
     print time.time() - start_time
 
